@@ -1,0 +1,58 @@
+- hosts: kubernetes-master
+  become: yes
+  tasks:
+    - name: Initialize the cluster
+      shell: kubeadm init --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address=61.252.52.18 >> cluster_initialized.txt
+      args:
+        chdir: $HOME
+        creates: cluster_initialized.txt
+
+    - name: Create .kube directory
+      become: yes
+      become_user: tein
+      file:
+        path: $HOME/.kube
+        state: directory
+        mode: 0755
+
+    - name: Copy admin.conf to user's kube config
+      become: yes
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/{{ ansible_user }}/.kube/config
+        remote_src: yes
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+        #    - name: Download Calico yaml file
+        #become_user: usman
+        #get_url:
+        #url: kubectl create -f https://docs.projectcalico.org/manifests/custom-resources.yaml
+        #dest: /home/usman/calico.yaml		
+        #- name: Update calico.yaml file to insert IP_AUTODETECTION_METHOD=can-reach=IPAddress
+        #blockinfile:
+        #path: /home/usman/calico.yaml
+        #backup: no
+        #marker: "# {mark} Inserting IP_AUTODETECTION_METHOD"
+        #block: |2
+        #              # Auto-detection IP method
+        #              - name: IP_AUTODETECTION_METHOD
+        #                value:  "can-reach=10.0.2.15"
+        #insertbefore: "Enable IPIP"		 
+        
+    - name: Install tigera operator
+      become: yes
+      become_user: tein
+      shell: kubectl create -f https://docs.projectcalico.org/manifests/tigera-operator.yaml >> tigera_operator.txt
+      args:
+        chdir: $HOME
+        creates: tigera_operator.txt
+
+    - name: Apply the calico manisfest file using kubectl apply -f calico.yaml
+      become: yes	
+      become_user: tein
+      shell: kubectl create -f https://docs.projectcalico.org/manifests/custom-resources.yaml >> calico_network.txt
+      args:
+        chdir: $HOME
+        creates: calico_network.txt		
+
