@@ -1,46 +1,93 @@
-- hosts: worker-1
+- hosts: smartx-micro-box-gist-1 
   become: yes
   tasks:
-   - name: Install Docker
-     apt:
-       name: docker.io
-       state: present
-       update_cache: true
    - name: Install APT Transport HTTPS
      apt:
        name: apt-transport-https
        state: present
+
    - name: Add Kubernetes apt-key
      apt_key:
        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
        state: present
-   - name: Add Kubernetes' APT repository
-     apt_repository:
-      repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
-      state: present
-      filename: 'kubernetes'
-   - name: Install kubelet
-     apt:
-       name: kubelet
+
+   - name: Add an apt signing key for Docker
+     apt_key:
+       url: https://download.docker.com/linux/ubuntu/gpg
        state: present
-       update_cache: true
-   - name: Install kubeadm
+
+   - name: Get the latest stable version
+     shell: lsb_release -cs
+     register: stable_version
+
+   - name: Add apt repository for stable version
+     apt_repository:
+       repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ stable_version.stdout_lines[0] }} stable
+       state: present
+
+   - name: Install docker and its dependecies
      apt:
-       name: kubeadm
-       state: present 
+       name: "{{ packages }}"
+       state: present
+       update_cache: yes
+     vars:
+       packages:
+         - docker-ce
+         - docker-ce-cli
+         - containerd.io
+     notify:
+       - docker status
+
+   - name: Add "{{ ansible_user }}" current user to docker group
+     user:
+       name: "{{ ansible_user}}"
+       group: docker
+
+   - name: Remove swapfile from /etc/fstab
+     mount:
+       name: "{{ item }}"
+       fstype: swap
+       state: absent 
+       src: none 
+     with_items:
+         - swap
+         - none
+
+   - name: Disable swap
+     command: swapoff -a
+     when: ansible_swaptotal_mb > 0
+
+   - name: Install Kubernetes binaries
+     apt:
+       name: "{{ packages }}"
+       state: present
+       update_cache: yes
+     vars:
+       packages:
+         - kubelet
+         - kubeadm
+
    - name: Install bridge-utils
      apt:
        name: bridge-utils
        state: present 	
        update_cache: true
+
    - name: Install hostapd
      apt:
        name: hostapd
        state: present 	
        update_cache: true 
+
    - name: Install dnsmasq
      apt:
        name: dnsmasq
        state: present 	
        update_cache: true	
 
+   - name: Hold tools
+     command: apt-mark hold kubelet kubeadm docker-ce docker-ce-cli containerd.io
+   
+  handlers:
+   - name: docker status
+     service: name=docker state=started

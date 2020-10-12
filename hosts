@@ -2,7 +2,8 @@
 kubernetes-master ansible_host=x.x.x.x ansible_user=tein
 
 [workers]
-worker-1 ansible_host=x.x.x.x ansible_user=tein
+smartx-micro-box-gist-1 ansible_host=x.x.x.x ansible_user=tein
+smartx-micro-box-gist-2 ansible_host=x.x.x.x ansible_user=tein
 
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3
